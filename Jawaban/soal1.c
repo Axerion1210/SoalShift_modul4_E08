@@ -9,9 +9,7 @@
 #include <errno.h>
 #include <sys/time.h>
 
-#ifdef linux
 #define _XOPEN_SOURCE 700
-#endif
 
 char cipher[] = "qE1~ YMUR2\"`hNIdPzi\%^t@(Ao:=CQ,nx4S[7mHFye#aT6+v)DfKL$r?bkOGB>}!9_wV\']jcp5JZ&Xl|\\8s;g<{3.u*W-0";
 int key;
@@ -49,17 +47,12 @@ char decrypt(char *fname)
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
     int res;
-	char fpath[1000];
-    char tmp[1000];
+	char fpath[1000],tmp[1000];
     strcpy(tmp,path);
     encrypt(tmp);
 
-	if(strcmp(path,"/") == 0)
-	{
-		path=dirpath;
-		sprintf(fpath,"%s",path);
-	}
-	else sprintf(fpath, "%s%s",dirpath,tmp);
+    sprintf(fpath,"%s%s",dirpath,tmp);
+
 	res = lstat(fpath, stbuf);
 
 	if (res == -1)
@@ -99,9 +92,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		memset(&st, 0, sizeof(st));
 		st.st_ino = de->d_ino;
 		st.st_mode = de->d_type << 12;
-
         // printf("=====%s\n",de->d_name);
-
         char *tmp = de->d_name;
 		if(strcmp(de->d_name,".")==0 || strcmp(de->d_name,"..")==0)
 			continue;
@@ -255,7 +246,7 @@ static int xmp_mkdir(const char *path, mode_t mode)
 
 static int xmp_write(const char *path, const char *buf, size_t size,
 		     off_t offset, struct fuse_file_info *fi)
-{	
+{
 	char fpath[1000];
     char tmp[1000];
     strcpy(tmp,path);
@@ -281,6 +272,29 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 
 	close(fd);
 	return res;
+}
+
+static int xmp_chmod(const char *path, mode_t mode)
+{
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+	int res;
+
+	res = chmod(fpath, mode);
+	if (res == -1)
+		return -errno;
+
+	return 0;
 }
 
 static int xmp_rename(const char *from, const char *to)
@@ -341,54 +355,6 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 	return 0;
 }
 
-#ifdef HAVE_UTIMENSAT
-static int xmp_utimens(const char *path, const struct timespec ts[2])
-{
-	char fpath[1000];
-    char tmp[1000];
-    strcpy(tmp,path);
-    encrypt(tmp);
-
-	if(strcmp(path,"/") == 0)
-	{
-		path=dirpath;
-		sprintf(fpath,"%s",path);
-	}
-	else sprintf(fpath, "%s%s",dirpath,tmp);
-	int res;
-
-	/* don't use utime/utimes since they follow symlinks */
-	res = utimensat(0, fpath, ts, AT_SYMLINK_NOFOLLOW);
-	if (res == -1)
-		return -errno;
-
-	return 0;
-}
-#endif
-
-static int xmp_chmod(const char *path, mode_t mode)
-{
-	char fpath[1000];
-    char tmp[1000];
-    strcpy(tmp,path);
-    encrypt(tmp);
-
-	if(strcmp(path,"/") == 0)
-	{
-		path=dirpath;
-		sprintf(fpath,"%s",path);
-	}
-	else sprintf(fpath, "%s%s",dirpath,tmp);
-
-	int res;
-
-	res = chmod(fpath, mode);
-	if (res == -1)
-		return -errno;
-
-	return 0;
-}
-
 static int xmp_access(const char *path, int mask)
 {	
 	char fpath[1000];
@@ -436,7 +402,6 @@ static int xmp_readlink(const char *path, char *buf, size_t size)
 	buf[res] = '\0';
 	return 0;
 }
-
 
 static int xmp_symlink(const char *from, const char *to)
 {	
@@ -580,11 +545,8 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
-static int xmp_release(const char *path, struct fuse_file_info *fi)
+static int xmp_utimens(const char *path, const struct timespec ts[2])
 {
-	/* Just a stub.	 This method is optional and can safely be left
-	   unimplemented */
-
 	char fpath[1000];
     char tmp[1000];
     strcpy(tmp,path);
@@ -596,64 +558,36 @@ static int xmp_release(const char *path, struct fuse_file_info *fi)
 		sprintf(fpath,"%s",path);
 	}
 	else sprintf(fpath, "%s%s",dirpath,tmp);
+	int res;
 
+	/* don't use utime/utimes since they follow symlinks */
+	res = utimensat(0, fpath, ts, AT_SYMLINK_NOFOLLOW);
+	if (res == -1)
+		return -errno;
 
-	(void) path;
-	(void) fi;
-	return 0;
-}
-
-static int xmp_fsync(const char *path, int isdatasync,
-		     struct fuse_file_info *fi)
-{
-	/* Just a stub.	 This method is optional and can safely be left
-	   unimplemented */
-	char fpath[1000];
-    char tmp[1000];
-    strcpy(tmp,path);
-    encrypt(tmp);
-
-	if(strcmp(path,"/") == 0)
-	{
-		path=dirpath;
-		sprintf(fpath,"%s",path);
-	}
-	else sprintf(fpath, "%s%s",dirpath,tmp);
-
-	(void) path;
-	(void) isdatasync;
-	(void) fi;
 	return 0;
 }
 
 static struct fuse_operations xmp_oper = {
 	.getattr	= xmp_getattr,
-	.access		= xmp_access,
-	.readlink	= xmp_readlink,
 	.readdir	= xmp_readdir,
-	.mknod		= xmp_mknod,
+	.read		= xmp_read,
 	.mkdir		= xmp_mkdir,
-	.symlink	= xmp_symlink,
+	.write		= xmp_write,
+	.chmod		= xmp_chmod,
+	.mknod		= xmp_mknod,
 	.unlink		= xmp_unlink,
 	.rmdir		= xmp_rmdir,
 	.rename		= xmp_rename,
+	.statfs		= xmp_statfs,
+	.access		= xmp_access,
+	.readlink	= xmp_readlink,
+	.symlink	= xmp_symlink,
 	.link		= xmp_link,
-	.chmod		= xmp_chmod,
 	.chown		= xmp_chown,
 	.truncate	= xmp_truncate,
-	
-	#ifdef HAVE_UTIMENSAT
-	.utimens	= xmp_utimens,
-	#endif
-	
 	.open		= xmp_open,
-	.read		= xmp_read,
-	.write		= xmp_write,
-	.statfs		= xmp_statfs,
-	.release	= xmp_release,
-	.fsync		= xmp_fsync,
-
-	
+	.utimens	= xmp_utimens
 };
 
 int main(int argc, char *argv[])
