@@ -234,10 +234,7 @@ static int xmp_mkdir(const char *path, mode_t mode)
 
 static int xmp_write(const char *path, const char *buf, size_t size,
 		     off_t offset, struct fuse_file_info *fi)
-{
-	int fd;
-	int res;
-
+{	
 	char fpath[1000];
     char tmp[1000];
     strcpy(tmp,path);
@@ -249,6 +246,8 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 		sprintf(fpath,"%s",path);
 	}
 	else sprintf(fpath, "%s%s",dirpath,tmp);
+	int fd;
+	int res;
 
 	(void) fi;
 	fd = open(fpath, O_WRONLY);
@@ -261,6 +260,90 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 
 	close(fd);
 	return res;
+}
+
+static int xmp_rename(const char *from, const char *to)
+{
+	char ffrom[1000];
+	char fto[1000];
+    char tmp[1000];
+    strcpy(tmp,from);
+    encrypt(tmp);
+
+	if(strcmp(from,"/") == 0)
+	{
+		from=dirpath;
+		sprintf(ffrom,"%s",from);
+	}
+	else sprintf(ffrom, "%s%s",dirpath,tmp);
+
+
+    strcpy(tmp,to);
+    encrypt(tmp);
+
+	if(strcmp(to,"/") == 0)
+	{
+		to=dirpath;
+		sprintf(fto,"%s", to);
+	}
+	else sprintf(fto, "%s%s",dirpath,tmp);
+	
+	int res;
+
+	res = rename(ffrom, fto);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+static int xmp_statfs(const char *path, struct statvfs *stbuf)
+{
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+	int res;
+
+	res = statvfs(fpath, stbuf);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+
+
+
+static int xmp_utimens(const char *path, const struct timespec ts[2])
+{
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+	int res;
+
+	/* don't use utime/utimes since they follow symlinks */
+	res = utimensat(0, fpath, ts, AT_SYMLINK_NOFOLLOW);
+	if (res == -1)
+		return -errno;
+
+	return 0;
 }
 
 static int xmp_chmod(const char *path, mode_t mode)
@@ -296,6 +379,9 @@ static struct fuse_operations xmp_oper = {
 	.mknod		= xmp_mknod,
 	.unlink		= xmp_unlink,
 	.rmdir		= xmp_rmdir,
+	.utimens	= xmp_utimens,
+	.rename		= xmp_rename,
+	.statfs		= xmp_statfs,
 
 };
 
