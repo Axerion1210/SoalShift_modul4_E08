@@ -44,12 +44,17 @@ char decrypt(char *fname)
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
     int res;
-	char fpath[1000],a[1000];
-    strcpy(a,path);
-    encrypt(a);
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
 
-    sprintf(fpath,"%s%s",dirpath,a);
-
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
 	res = lstat(fpath, stbuf);
 
 	if (res == -1)
@@ -369,20 +374,269 @@ static int xmp_chmod(const char *path, mode_t mode)
 	return 0;
 }
 
+static int xmp_access(const char *path, int mask)
+{	
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+
+	int res;
+
+	res = access(fpath, mask);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+static int xmp_readlink(const char *path, char *buf, size_t size)
+{	
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+	int res;
+
+	res = readlink(fpath, buf, size - 1);
+	if (res == -1)
+		return -errno;
+
+	buf[res] = '\0';
+	return 0;
+}
+
+
+static int xmp_symlink(const char *from, const char *to)
+{	
+	char ffrom[1000];
+	char fto[1000];
+    char tmp[1000];
+    strcpy(tmp,from);
+    encrypt(tmp);
+
+	if(strcmp(from,"/") == 0)
+	{
+		from=dirpath;
+		sprintf(ffrom,"%s",from);
+	}
+	else sprintf(ffrom, "%s%s",dirpath,tmp);
+
+
+    strcpy(tmp,to);
+    encrypt(tmp);
+
+	if(strcmp(to,"/") == 0)
+	{
+		to=dirpath;
+		sprintf(fto,"%s", to);
+	}
+	else sprintf(fto, "%s%s",dirpath,tmp);
+
+	int res;
+
+	res = symlink(ffrom, fto);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+static int xmp_link(const char *from, const char *to)
+{	
+	char ffrom[1000];
+	char fto[1000];
+    char tmp[1000];
+    strcpy(tmp,from);
+    encrypt(tmp);
+
+	if(strcmp(from,"/") == 0)
+	{
+		from=dirpath;
+		sprintf(ffrom,"%s",from);
+	}
+	else sprintf(ffrom, "%s%s",dirpath,tmp);
+
+
+    strcpy(tmp,to);
+    encrypt(tmp);
+
+	if(strcmp(to,"/") == 0)
+	{
+		to=dirpath;
+		sprintf(fto,"%s", to);
+	}
+	else sprintf(fto, "%s%s",dirpath,tmp);
+
+
+	int res;
+
+	res = link(ffrom, fto);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+static int xmp_chown(const char *path, uid_t uid, gid_t gid)
+{	
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+	int res;
+
+	res = lchown(fpath, uid, gid);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+static int xmp_truncate(const char *path, off_t size)
+{
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+	int res;
+
+	res = truncate(fpath, size);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+static int xmp_open(const char *path, struct fuse_file_info *fi)
+{	
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+
+	int res;
+
+	res = open(fpath, fi->flags);
+	if (res == -1)
+		return -errno;
+
+	close(res);
+	return 0;
+}
+
+static int xmp_release(const char *path, struct fuse_file_info *fi)
+{
+	/* Just a stub.	 This method is optional and can safely be left
+	   unimplemented */
+
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+
+	(void) path;
+	(void) fi;
+	return 0;
+}
+
+static int xmp_fsync(const char *path, int isdatasync,
+		     struct fuse_file_info *fi)
+{
+	/* Just a stub.	 This method is optional and can safely be left
+	   unimplemented */
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+	(void) path;
+	(void) isdatasync;
+	(void) fi;
+	return 0;
+}
+
 static struct fuse_operations xmp_oper = {
 	.getattr	= xmp_getattr,
+	.access		= xmp_access,
+	.readlink	= xmp_readlink,
 	.readdir	= xmp_readdir,
-	.read		= xmp_read,
-	.mkdir		= xmp_mkdir,
-	.write		= xmp_write,
-	.chmod		= xmp_chmod,
 	.mknod		= xmp_mknod,
+	.mkdir		= xmp_mkdir,
+	.symlink	= xmp_symlink,
 	.unlink		= xmp_unlink,
 	.rmdir		= xmp_rmdir,
-	.utimens	= xmp_utimens,
 	.rename		= xmp_rename,
+	.link		= xmp_link,
+	.chmod		= xmp_chmod,
+	.chown		= xmp_chown,
+	.truncate	= xmp_truncate,
+	
+	.utimens	= xmp_utimens,
+	
+	.open		= xmp_open,
+	.read		= xmp_read,
+	.write		= xmp_write,
 	.statfs		= xmp_statfs,
+	.release	= xmp_release,
+	.fsync		= xmp_fsync,
 
+	
 };
 
 int main(int argc, char *argv[])
