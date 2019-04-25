@@ -4,9 +4,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <errno.h>
 #include <sys/time.h>
+
+#ifdef linux
+#define _XOPEN_SOURCE 700
+#endif
 
 char cipher[] = "qE1~ YMUR2\"`hNIdPzi\%^t@(Ao:=CQ,nx4S[7mHFye#aT6+v)DfKL$r?bkOGB>}!9_wV\']jcp5JZ&Xl|\\8s;g<{3.u*W-0";
 int key;
@@ -336,9 +341,7 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 	return 0;
 }
 
-
-
-
+#ifdef HAVE_UTIMENSAT
 static int xmp_utimens(const char *path, const struct timespec ts[2])
 {
 	char fpath[1000];
@@ -361,6 +364,7 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 
 	return 0;
 }
+#endif
 
 static int xmp_chmod(const char *path, mode_t mode)
 {
@@ -638,7 +642,9 @@ static struct fuse_operations xmp_oper = {
 	.chown		= xmp_chown,
 	.truncate	= xmp_truncate,
 	
+	#ifdef HAVE_UTIMENSAT
 	.utimens	= xmp_utimens,
+	#endif
 	
 	.open		= xmp_open,
 	.read		= xmp_read,
