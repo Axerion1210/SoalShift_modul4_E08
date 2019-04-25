@@ -134,6 +134,35 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 	return res;
 }
 
+static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
+{
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+	int res;
+	if (S_ISREG(mode)) {
+		res = open(path, O_CREAT | O_EXCL | O_WRONLY, mode);
+		if (res >= 0)
+			res = close(res);
+	} else if (S_ISFIFO(mode))
+		res = mkfifo(path, mode);
+	else
+		res = mknod(path, mode, rdev);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
 static int xmp_mkdir(const char *path, mode_t mode)
 {
 	char fpath[1000];
@@ -162,7 +191,8 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 	int fd;
 	int res;
 
-	char tmp[1000];
+	char fpath[1000];
+    char tmp[1000];
     strcpy(tmp,path);
     encrypt(tmp);
 
@@ -188,6 +218,18 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 
 static int xmp_chmod(const char *path, mode_t mode)
 {
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
 	int res;
 
 	res = chmod(path, mode);
@@ -204,6 +246,8 @@ static struct fuse_operations xmp_oper = {
 	.mkdir		= xmp_mkdir,
 	.write		= xmp_write,
 	.chmod		= xmp_chmod,
+	.mknod		= xmp_mknod,
+
 };
 
 int main(int argc, char *argv[])
