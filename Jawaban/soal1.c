@@ -10,7 +10,7 @@
 
 char cipher[] = "qE1~ YMUR2\"`hNIdPzi\%^t@(Ao:=CQ,nx4S[7mHFye#aT6+v)DfKL$r?bkOGB>}!9_wV\']jcp5JZ&Xl|\\8s;g<{3.u*W-0";
 int key;
-static const char *dirpath = "/home/siung2/shift4";
+static const char *dirpath = "/home/ivan/shift4";
 
 char encrypt(char *fname)
 {
@@ -98,7 +98,8 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         // printf("=====%s\n",de->d_name);
 
         char *tmp = de->d_name;
-
+		if(strcmp(de->d_name,".")==0 || strcmp(de->d_name,"..")==0)
+			continue;
         decrypt(tmp);
 
 		res = (filler(buf, tmp, &st, 0));
@@ -190,7 +191,10 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 {
 	char fpath[1000];
     char tmp[1000];
+
     strcpy(tmp,path);
+	if(strncmp(path,"/YOUTUBER/",10)==0)
+		sprintf(tmp,"%s.iz1",tmp);
     encrypt(tmp);
 
 	if(strcmp(path,"/") == 0)
@@ -202,10 +206,14 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 
 	int res;
 	if (S_ISREG(mode)) {
-		res = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
+		if(strncmp(path,"/YOUTUBER/",10)==0)
+			res = open(fpath, O_CREAT | O_EXCL | O_WRONLY, 0640);
+		else	
+			res = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
 		if (res >= 0)
 			res = close(res);
-	} else if (S_ISFIFO(mode))
+	}
+	else if (S_ISFIFO(mode))
 		res = mkfifo(fpath, mode);
 	else
 		res = mknod(fpath, mode, rdev);
@@ -230,7 +238,10 @@ static int xmp_mkdir(const char *path, mode_t mode)
 	else sprintf(fpath, "%s%s",dirpath,tmp);
 
 	int res;
-	res = mkdir(fpath, mode);
+	if(strncmp(path,"/YOUTUBER/",10)==0)
+		res = mkdir(fpath, 0750);
+	else	
+		res = mkdir(fpath, mode);
 	if (res == -1)
 		return -errno;
 
