@@ -10,7 +10,7 @@
 
 char cipher[] = "qE1~ YMUR2\"`hNIdPzi\%^t@(Ao:=CQ,nx4S[7mHFye#aT6+v)DfKL$r?bkOGB>}!9_wV\']jcp5JZ&Xl|\\8s;g<{3.u*W-0";
 int key;
-static const char *dirpath = "/home/ivan/shift4";
+static const char *dirpath = "/home/siung2/shift4";
 
 char encrypt(char *fname)
 {
@@ -104,6 +104,53 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
+static int xmp_unlink(const char *path)
+{
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+	
+	int res;
+
+	res = unlink(fpath);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+
+static int xmp_rmdir(const char *path)
+{	
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+	int res;
+
+	res = rmdir(fpath);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 		    struct fuse_file_info *fi)
 {
@@ -150,13 +197,13 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 
 	int res;
 	if (S_ISREG(mode)) {
-		res = open(path, O_CREAT | O_EXCL | O_WRONLY, mode);
+		res = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
 		if (res >= 0)
 			res = close(res);
 	} else if (S_ISFIFO(mode))
-		res = mkfifo(path, mode);
+		res = mkfifo(fpath, mode);
 	else
-		res = mknod(path, mode, rdev);
+		res = mknod(fpath, mode, rdev);
 	if (res == -1)
 		return -errno;
 
@@ -204,7 +251,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 	else sprintf(fpath, "%s%s",dirpath,tmp);
 
 	(void) fi;
-	fd = open(path, O_WRONLY);
+	fd = open(fpath, O_WRONLY);
 	if (fd == -1)
 		return -errno;
 
@@ -232,7 +279,7 @@ static int xmp_chmod(const char *path, mode_t mode)
 
 	int res;
 
-	res = chmod(path, mode);
+	res = chmod(fpath, mode);
 	if (res == -1)
 		return -errno;
 
@@ -247,6 +294,8 @@ static struct fuse_operations xmp_oper = {
 	.write		= xmp_write,
 	.chmod		= xmp_chmod,
 	.mknod		= xmp_mknod,
+	.unlink		= xmp_unlink,
+	.rmdir		= xmp_rmdir,
 
 };
 
