@@ -8,6 +8,10 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
 
 #define _XOPEN_SOURCE 700
 
@@ -49,6 +53,8 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
     int res;
 	char fpath[1000],tmp[1000];
     strcpy(tmp,path);
+	// if(strstr(tmp,".izl"))
+	// 	tmp[strlen(tmp)-4]='\0';
     encrypt(tmp);
 
     sprintf(fpath,"%s%s",dirpath,tmp);
@@ -64,17 +70,24 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		       off_t offset, struct fuse_file_info *fi)
 {
+	char pathMiris[1000];
+	char miris[15] = "filemiris.txt";
+	encrypt(miris);
+
+	sprintf(pathMiris, "%s/%s", dirpath,miris);
+	FILE *rusak = fopen(pathMiris, "a");
+
     char fpath[1000];
-    char tmp[1000];
-    strcpy(tmp,path);
-    encrypt(tmp);
+    char temp[1000];
+    strcpy(temp,path);
+    encrypt(temp);
 
 	if(strcmp(path,"/") == 0)
 	{
 		path=dirpath;
 		sprintf(fpath,"%s",path);
 	}
-	else sprintf(fpath, "%s%s",dirpath,tmp);
+	else sprintf(fpath, "%s%s",dirpath,temp);
 	int res = 0;
 
 	DIR *dp;
@@ -83,25 +96,39 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	(void) offset;
 	(void) fi;
 
+
 	dp = opendir(fpath);
 	if (dp == NULL)
 		return -errno;
 
 	while ((de = readdir(dp)) != NULL) {
-		struct stat st;
+		struct stat st, info;
 		memset(&st, 0, sizeof(st));
 		st.st_ino = de->d_ino;
 		st.st_mode = de->d_type << 12;
-        // printf("=====%s\n",de->d_name);
-        char *tmp = de->d_name;
+        
 		if(strcmp(de->d_name,".")==0 || strcmp(de->d_name,"..")==0)
 			continue;
-        decrypt(tmp);
 
-		res = (filler(buf, tmp, &st, 0));
+		stat(temp, &info);
+		struct passwd *pw = getpwuid(info.st_uid);
+		struct group  *gr = getgrgid(info.st_gid);
+		int readable = access(temp, R_OK);			//return 0 if it is readable
+		char date[30];
+
+		if (de->d_type == DT_REG && strcmp(temp, pathMiris)!=0 && readable!=0 && (strcmp(pw->pw_name, "chipset") || strcmp(pw->pw_name, "ic_controller")) && strcmp(gr->gr_name, "rusak")) {
+			strftime(date, 30, "%Y-%m-%d %H:%M:%S", localtime(&(info.st_atime)));
+			fprintf(rusak, "%s\t\t%d\t\t%d\t\t%s\n", de->d_name, gr->gr_gid, pw->pw_uid, date);
+			remove(temp);
+			continue;
+		}
+
+        decrypt(de->d_name);
+		res = (filler(buf, de->d_name, &st, 0));
 			if(res!=0) break;
 	}
 
+	fclose(rusak);
 	closedir(dp);
 	return 0;
 }
@@ -128,7 +155,6 @@ static int xmp_unlink(const char *path)
 
 	return 0;
 }
-
 
 static int xmp_rmdir(const char *path)
 {	
@@ -183,42 +209,6 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 	return res;
 }
 
-static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
-{
-	char fpath[1000];
-    char tmp[1000];
-
-    strcpy(tmp,path);
-	if(strncmp(path,"/YOUTUBER/",10)==0)
-		sprintf(tmp,"%s.iz1",tmp);
-    encrypt(tmp);
-
-	if(strcmp(path,"/") == 0)
-	{
-		path=dirpath;
-		sprintf(fpath,"%s",path);
-	}
-	else sprintf(fpath, "%s%s",dirpath,tmp);
-
-	int res;
-	if (S_ISREG(mode)) {
-		if(strncmp(path,"/YOUTUBER/",10)==0)
-			res = open(fpath, O_CREAT | O_EXCL | O_WRONLY, 0640);
-		else	
-			res = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
-		if (res >= 0)
-			res = close(res);
-	}
-	else if (S_ISFIFO(mode))
-		res = mkfifo(fpath, mode);
-	else
-		res = mknod(fpath, mode, rdev);
-	if (res == -1)
-		return -errno;
-
-	return 0;
-}
-
 static int xmp_mkdir(const char *path, mode_t mode)
 {
 	char fpath[1000];
@@ -234,7 +224,7 @@ static int xmp_mkdir(const char *path, mode_t mode)
 	else sprintf(fpath, "%s%s",dirpath,tmp);
 
 	int res;
-	if(strncmp(path,"/YOUTUBER/",10)==0)
+	if(strstr(tmp,"/YOUTUBER"))
 		res = mkdir(fpath, 0750);
 	else	
 		res = mkdir(fpath, mode);
@@ -249,6 +239,8 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 {
 	char fpath[1000];
     char tmp[1000];
+	if(strstr(path,"/YOUTUBER"))
+		strcat(path,".iz1");
     strcpy(tmp,path);
     encrypt(tmp);
 
@@ -281,6 +273,20 @@ static int xmp_chmod(const char *path, mode_t mode)
     strcpy(tmp,path);
     encrypt(tmp);
 
+	if(strstr(path,".iz1") && strstr(path,"/YOUTUBER")){
+		pid_t child_id;
+		child_id = fork();
+		if (child_id < 0) {
+			exit(EXIT_FAILURE);
+		}
+
+		if (child_id == 0) {
+			char *argv[] = {"zenity", "--error", "--title", "Error", "--text", "File ekstensi iz1 tidak boleh diubah permissionnya.", NULL};
+			execv("/usr/bin/zenity", argv);
+  		}
+		return 0;
+	}
+
 	if(strcmp(path,"/") == 0)
 	{
 		path=dirpath;
@@ -289,7 +295,6 @@ static int xmp_chmod(const char *path, mode_t mode)
 	else sprintf(fpath, "%s%s",dirpath,tmp);
 
 	int res;
-
 	res = chmod(fpath, mode);
 	if (res == -1)
 		return -errno;
@@ -549,6 +554,8 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 {
 	char fpath[1000];
     char tmp[1000];
+	if(strstr(path,"/YOUTUBER"))
+		strcat(path,".iz1");
     strcpy(tmp,path);
     encrypt(tmp);
 
@@ -568,6 +575,36 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 	return 0;
 }
 
+static int xmp_create(const char *path, mode_t mode,
+                       struct fuse_file_info *fi)
+ {
+        char fpath[1000], tmp[1000];
+		if(strstr(path,"/YOUTUBER"))
+			strcat(path,".iz1");
+		strcpy(tmp, path);
+		encrypt(tmp);
+
+		if(strcmp(tmp,"/") == 0)
+		{
+			path=dirpath;
+			sprintf(fpath,"%s",path);
+		}
+		else sprintf(fpath, "%s%s",dirpath,tmp);
+			
+		int res;
+
+		if(strstr(path,"/YOUTUBER") != 0)
+			res = open(fpath, fi->flags, 0640);
+		else
+			res = open(fpath, fi->flags, mode);
+ 
+        if (res == -1)
+                return -errno;
+ 
+        fi->fh = res;
+        return 0;
+ }
+
 static struct fuse_operations xmp_oper = {
 	.getattr	= xmp_getattr,
 	.readdir	= xmp_readdir,
@@ -575,7 +612,6 @@ static struct fuse_operations xmp_oper = {
 	.mkdir		= xmp_mkdir,
 	.write		= xmp_write,
 	.chmod		= xmp_chmod,
-	.mknod		= xmp_mknod,
 	.unlink		= xmp_unlink,
 	.rmdir		= xmp_rmdir,
 	.rename		= xmp_rename,
@@ -587,7 +623,8 @@ static struct fuse_operations xmp_oper = {
 	.chown		= xmp_chown,
 	.truncate	= xmp_truncate,
 	.open		= xmp_open,
-	.utimens	= xmp_utimens
+	.utimens	= xmp_utimens,
+	.create		= xmp_create,
 };
 
 int main(int argc, char *argv[])
