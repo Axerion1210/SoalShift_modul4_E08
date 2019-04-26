@@ -218,6 +218,147 @@ static int xmp_mkdir(const char *path, mode_t mode)
 }
 ```
 
+Fungsi create
+
+```c
+static int xmp_create(const char *path, mode_t mode,
+                       struct fuse_file_info *fi)
+ {
+        char fpath[1000], tmp[1000];
+		if(strstr(path,"/YOUTUBER")) 
+            //jika dalam folder youtuber (terdapat substring/youtuber)
+			strcat(path,".iz1"); // tambah ekstensi ".z1"
+		strcpy(tmp, path); //update path
+		encrypt(tmp);
+
+		if(strcmp(tmp,"/") == 0)
+		{
+			path=dirpath;
+			sprintf(fpath,"%s",path);
+		}
+		else sprintf(fpath, "%s%s",dirpath,tmp);
+			
+		int res;
+
+		if(strstr(path,"/YOUTUBER") != 0) // penentuan permission
+			res = open(fpath, fi->flags, 0640);
+		else
+			res = open(fpath, fi->flags, mode);
+ 
+        if (res == -1)
+                return -errno;
+ 
+        fi->fh = res;
+        return 0;
+ }
+```
+
+Fungsi write
+
+```c
+static int xmp_write(const char *path, const char *buf, size_t size,
+		     off_t offset, struct fuse_file_info *fi)
+{
+	char fpath[1000];
+    char tmp[1000];
+	if(strstr(path,"/YOUTUBER")) // jika sesuai kriteria
+		strcat(path,".iz1"); // tambahkan ekstensi
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+	int fd;
+	int res;
+
+	(void) fi;
+	fd = open(fpath, O_WRONLY);
+	if (fd == -1)
+		return -errno;
+
+	res = pwrite(fd, buf, size, offset);
+	if (res == -1)
+		res = -errno;
+
+	close(fd);
+	return res;
+}
+```
+
+Fungsi chmod
+
+```c
+static int xmp_chmod(const char *path, mode_t mode)
+{
+	char fpath[1000];
+    char tmp[1000];
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strstr(path,".iz1") && strstr(path,"/YOUTUBER")){ // jika sesuai kriteria
+		pid_t child_id;
+		child_id = fork(); // buat thread untuk mengeluarkan error
+		if (child_id < 0) {
+			exit(EXIT_FAILURE);
+		}
+		
+        //tampilkan error
+		if (child_id == 0) {
+			char *argv[] = {"zenity", "--error", "--title", "Error", "--text", "File ekstensi iz1 tidak boleh diubah permissionnya.", NULL};
+			execv("/usr/bin/zenity", argv);
+  		}
+		return 0;
+	}
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+
+	int res;
+	res = chmod(fpath, mode);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+```
+
+Fungsi utimens
+
+```c
+static int xmp_utimens(const char *path, const struct timespec ts[2])
+{
+	char fpath[1000];
+    char tmp[1000];
+	if(strstr(path,"/YOUTUBER"))// jika pada folder youtuber
+		strcat(path,".iz1");
+    strcpy(tmp,path);
+    encrypt(tmp);
+
+	if(strcmp(path,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+	int res;
+
+	/* don't use utime/utimes since they follow symlinks */
+	res = utimensat(0, fpath, ts, AT_SYMLINK_NOFOLLOW);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+```
+
 
 
 ## SOAL 5
