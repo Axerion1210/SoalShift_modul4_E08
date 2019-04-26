@@ -19,6 +19,13 @@ char cipher[] = "qE1~ YMUR2\"`hNIdPzi\%^t@(Ao:=CQ,nx4S[7mHFye#aT6+v)DfKL$r?bkOGB
 int key;
 static const char *dirpath = "/home/ivan/shift4";
 
+int lastCharPos(char *str, char chr){
+	char *posChar = strrchr(str, chr);
+	if(!posChar)
+		return 0;
+ 	return (int) (posChar-str);
+}
+
 char encrypt(char *fname)
 {
     char *ptr;
@@ -148,6 +155,60 @@ static int xmp_unlink(const char *path)
 	else sprintf(fpath, "%s%s",dirpath,tmp);
 	
 	int res;
+
+	int isFile,status;
+	if(isFile<0)
+		return 0;
+
+	char backup[] = "Backup", backpath[1000];
+	char command[1000], timestamp[100], zipname[1000], backupfile[1000], ext[1000], rawname[1000], pathcur[1000], trash[]="RecycleBin";
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
+	sprintf(timestamp, "%04d-%02d-%02d_%02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+
+	encrypt(backup);
+	strncpy(backpath, path, lastCharPos(path, '/'));
+	backpath[lastCharPos(path, '/')] = '\0';
+	sprintf(tmp, "%s/%s", backpath, backup);
+	strcpy(backpath, tmp);
+
+	int lastSlash = lastCharPos(path, '/');
+	int lastDot = lastCharPos(path, '.');
+	
+	if (lastDot==0)
+		lastDot = strlen(path);
+	else{
+		strcpy(ext, path+lastDot);
+		if (strcmp(ext, ".swp")==0)		//PREVENT .swp file to load
+		{
+			res = unlink(fpath);
+			
+			if (res == -1)
+				return -errno;
+			return 0;
+		}
+	}
+	strcpy(backupfile, path+lastSlash+1);
+	strncpy(rawname, path+lastSlash+1, lastDot-(lastSlash+1));
+	rawname[lastDot-(lastSlash+1)] = '\0';
+
+	strncpy(tmp, path, lastCharPos(path, '/'));
+	tmp[lastCharPos(path, '/')] = '\0';
+	sprintf(pathcur, "%s%s", dirpath, tmp);
+
+
+	sprintf(zipname, "%s_deleted_%s.zip\0", rawname, timestamp);
+	encrypt(zipname);
+	encrypt(trash);
+	encrypt(backupfile);
+	encrypt(rawname);
+	sprintf(command, "cd %s && mkdir -p '%s' && zip '%s/%s' '%s' '%s/%s'* && rm -f '%s/%s'*", pathcur, trash,trash, zipname, backupfile, backup, rawname, backup, rawname);
+
+	if (fork()==0)
+		execl("/bin/sh","/bin/sh", "-c", command, NULL);
+
+	while((wait(&status))>0);
 
 	res = unlink(fpath);
 	if (res == -1)
