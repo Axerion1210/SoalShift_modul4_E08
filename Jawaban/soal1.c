@@ -17,7 +17,7 @@
 
 char cipher[] = "qE1~ YMUR2\"`hNIdPzi\%^t@(Ao:=CQ,nx4S[7mHFye#aT6+v)DfKL$r?bkOGB>}!9_wV\']jcp5JZ&Xl|\\8s;g<{3.u*W-0";
 int key;
-static const char *dirpath = "/home/ivan/shift4";
+static const char *dirpath = "/home/siung2/shift4";
 
 int lastCharPos(char *str, char chr){
 	char *posChar = strrchr(str, chr);
@@ -334,6 +334,66 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 		res = -errno;
 
 	close(fd);
+	
+
+
+	encrypt(path);
+	sprintf(temp, "%s/%s", dirpath,path);
+	if(access(temp, R_OK)<0)				//JIKA FILE TIDAK ADA
+		return res;
+
+	printf("===============FILEPATH========%s\n", path);
+	char backup[] = "Backup", pathBackup[1000];
+	encrypt(backup);
+	strncpy(pathBackup, path, lastCharPos(path, '/'));
+	pathBackup[lastCharPos(path, '/')] = '\0';
+	sprintf(temp, "%s/%s", pathBackup, backup);
+	strcpy(pathBackup, temp);
+	sprintf(temp, "%s%s", dirpath, pathBackup);
+	printf("==================PATH BACKUP ===========%s\n", pathBackup);
+	mkdir(temp, 0777);
+
+
+	decrypt(path);
+	char filePathWithoutExt[1000], ext[100], timestamp[1000], fileNameBackup[1000], ch;
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
+	sprintf(timestamp, "%04d-%02d-%02d_%02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+	int posSlash = lastCharPos(path, '/');
+	int posDot = lastCharPos(path, '.');
+	
+	if (posDot==0) {
+		posDot = strlen(path);
+		ext[0] = '\0';
+	}
+	else{
+		strcpy(ext, path+posDot);
+		if (strcmp(ext, ".swp")==0)		//PREVENT .swp file to load
+			return res;
+	}
+	strncpy(filePathWithoutExt, path+posSlash+1, posDot-(posSlash+1));
+	filePathWithoutExt[posDot-(posSlash+1)] = '\0';
+	
+	sprintf(fileNameBackup,"%s_%s%s", filePathWithoutExt, timestamp, ext);
+	printf("===============PATH========%s\n", path);
+	printf("===============PATH========%d=====%d\n", posSlash, posDot);
+	printf("===============FILEPATH EDIT=======%s\n", fileNameBackup);
+	encrypt(fileNameBackup);
+	encrypt(path);
+	sprintf(temp, "%s%s", dirpath, path);
+	printf("==========DIR SOURCE========%s\n", temp);
+	FILE *source = fopen(temp, "r");
+
+	sprintf(temp, "%s%s/%s", dirpath, pathBackup, fileNameBackup);
+	printf("==========DIR TARGET========%s\n", temp);
+	FILE *target = fopen(temp, "w");
+
+	while ((ch = fgetc(source)) != EOF)
+		fprintf(target, "%c", ch);
+
+	fclose(target);
+	fclose(source);
 	return res;
 }
 
