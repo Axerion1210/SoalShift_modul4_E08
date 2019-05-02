@@ -89,13 +89,6 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	}
 	else sprintf(fpath, "%s%s",dirpath,temp);
 
-	char miris[15] = "filemiris.txt";
-	char pathMiris[1000];
-	encrypt(miris);
-
-	sprintf(pathMiris, "%s/%s", dirpath,miris);
-	FILE *rusak = fopen(pathMiris, "a");
-
 	int res = 0;
 
 	DIR *dp;
@@ -103,6 +96,13 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	(void) offset;
 	(void) fi;
+
+	char miris[15] = "filemiris.txt";
+	char pathMiris[1000];
+	encrypt(miris);
+
+	sprintf(pathMiris, "%s/%s", dirpath,miris);
+	FILE *rusak = fopen(pathMiris, "a");
 
 	dp = opendir(fpath);
 	if (dp == NULL)
@@ -117,23 +117,29 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		if(strcmp(de->d_name,".")==0 || strcmp(de->d_name,"..")==0)
 			continue;
 
+		char temp2[1000];
+		sprintf(temp2, "%s/%s", fpath, de->d_name);
+		stat(temp2, &info);
+		struct passwd *pw = getpwuid(info.st_uid);
+		struct group  *gr = getgrgid(info.st_gid);
+		int readable = access(temp2, R_OK);			//return 0 if it is readable
+		char date[30];
+		printf("000 %s\n",gr->gr_name);
+		printf("111 %s\n",pw->pw_name);
+		printf("222 %s\n",de->d_name);
+
+		if (de->d_type == DT_REG && readable!=0 && strcmp(temp2,pathMiris) != 0 && (strcmp(pw->pw_name, "chipset")==0 || strcmp(pw->pw_name, "ic_controller")==0) && strcmp(gr->gr_name, "rusak")==0) {
+			strftime(date, 30, "%Y-%m-%d %H:%M:%S", localtime(&(info.st_atime)));
+			decrypt(de->d_name);
+			printf("123123123 %s\n",date);
+			fprintf(rusak, "%s\t\t%d\t\t%d\t\t%s\n", de->d_name, gr->gr_gid, pw->pw_uid, date);
+			remove(temp2);
+			continue;
+		}
+
         decrypt(de->d_name);
 		res = (filler(buf, de->d_name, &st, 0));
 			if(res!=0) break;
-
-		char temp[1000];
-		stat(temp, &info);
-		struct passwd *pw = getpwuid(info.st_uid);
-		struct group  *gr = getgrgid(info.st_gid);
-		int readable = access(temp, R_OK);			//return 0 if it is readable
-		char date[30];
-
-		if (de->d_type == DT_REG && strcmp(temp, pathMiris)!=0  && readable!=0 && (strcmp(pw->pw_name, "chipset")==0 || strcmp(pw->pw_name, "ic_controller")==0) && strcmp(gr->gr_name, "rusak")==0) {
-			strftime(date, 30, "%Y-%m-%d %H:%M:%S", localtime(&(info.st_atime)));
-			fprintf(rusak, "%s\t\t%d\t\t%d\t\t%s\n", de->d_name, gr->gr_gid, pw->pw_uid, date);
-			remove(temp);
-			continue;
-		}
 	}
 
 	fclose(rusak);
