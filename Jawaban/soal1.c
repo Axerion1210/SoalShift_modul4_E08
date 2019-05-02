@@ -338,28 +338,22 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 
 
 	encrypt(path);
-	sprintf(temp, "%s/%s", dirpath,path);
-	if(access(temp, R_OK)<0)				//JIKA FILE TIDAK ADA
+	sprintf(tmp, "%s/%s", dirpath,path);
+	if(access(tmp, R_OK)<0)				//jika tidak ada
 		return res;
-
-	printf("===============FILEPATH========%s\n", path);
 	char backup[] = "Backup", pathBackup[1000];
 	encrypt(backup);
-	strncpy(pathBackup, path, lastCharPos(path, '/'));
-	pathBackup[lastCharPos(path, '/')] = '\0';
-	sprintf(temp, "%s/%s", pathBackup, backup);
-	strcpy(pathBackup, temp);
-	sprintf(temp, "%s%s", dirpath, pathBackup);
-	printf("==================PATH BACKUP ===========%s\n", pathBackup);
-	mkdir(temp, 0777);
-
-
+	strncpy(pathBackup, path, lastCharPos(path, '/'));// path directory
+	pathBackup[lastCharPos(path, '/')] = '\0'; // kasih end
+	sprintf(tmp, "%s/%s", pathBackup, backup); //  path backupan
+	strcpy(pathBackup, tmp); // pathbackuo = tmp = path file backup
+	sprintf(tmp, "%s%s", dirpath, pathBackup); // tmp ditambah dirpath
+	mkdir(tmp, 0777); // mkdir
 	decrypt(path);
 	char filePathWithoutExt[1000], ext[100], timestamp[1000], fileNameBackup[1000], ch;
 	time_t t = time(NULL);
 	struct tm tm = *localtime(&t);
 	sprintf(timestamp, "%04d-%02d-%02d_%02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-
 	int posSlash = lastCharPos(path, '/');
 	int posDot = lastCharPos(path, '.');
 	
@@ -369,29 +363,20 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 	}
 	else{
 		strcpy(ext, path+posDot);
-		if (strcmp(ext, ".swp")==0)		//PREVENT .swp file to load
+		if (strcmp(ext, ".swp")==0)	
 			return res;
 	}
-	strncpy(filePathWithoutExt, path+posSlash+1, posDot-(posSlash+1));
-	filePathWithoutExt[posDot-(posSlash+1)] = '\0';
-	
-	sprintf(fileNameBackup,"%s_%s%s", filePathWithoutExt, timestamp, ext);
-	printf("===============PATH========%s\n", path);
-	printf("===============PATH========%d=====%d\n", posSlash, posDot);
-	printf("===============FILEPATH EDIT=======%s\n", fileNameBackup);
-	encrypt(fileNameBackup);
+	strncpy(filePathWithoutExt, path+posSlash+1, posDot-(posSlash+1)); // nama file tanpa ext
+	filePathWithoutExt[posDot-(posSlash+1)] = '\0'; //end of string
+	sprintf(fileNameBackup,"%s_%s%s", filePathWithoutExt, timestamp, ext);//nama akhir
+	encrypt(fileNameBackup); 
 	encrypt(path);
-	sprintf(temp, "%s%s", dirpath, path);
-	printf("==========DIR SOURCE========%s\n", temp);
-	FILE *source = fopen(temp, "r");
-
-	sprintf(temp, "%s%s/%s", dirpath, pathBackup, fileNameBackup);
-	printf("==========DIR TARGET========%s\n", temp);
-	FILE *target = fopen(temp, "w");
-
+	sprintf(tmp, "%s%s", dirpath, path); // path akhir
+	FILE *source = fopen(tmp, "r");
+	sprintf(tmp, "%s%s/%s", dirpath, pathBackup, fileNameBackup);
+	FILE *target = fopen(tmp, "w");
 	while ((ch = fgetc(source)) != EOF)
 		fprintf(target, "%c", ch);
-
 	fclose(target);
 	fclose(source);
 	return res;
