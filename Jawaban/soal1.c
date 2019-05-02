@@ -77,13 +77,6 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		       off_t offset, struct fuse_file_info *fi)
 {
-	char pathMiris[1000];
-	char miris[15] = "filemiris.txt";
-	encrypt(miris);
-
-	sprintf(pathMiris, "%s/%s", dirpath,miris);
-	FILE *rusak = fopen(pathMiris, "a");
-
     char fpath[1000];
     char temp[1000];
     strcpy(temp,path);
@@ -95,6 +88,14 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		sprintf(fpath,"%s",path);
 	}
 	else sprintf(fpath, "%s%s",dirpath,temp);
+
+	char miris[15] = "filemiris.txt";
+	char pathMiris[1000];
+	encrypt(miris);
+
+	sprintf(pathMiris, "%s/%s", dirpath,miris);
+	FILE *rusak = fopen(pathMiris, "a");
+
 	int res = 0;
 
 	DIR *dp;
@@ -102,7 +103,6 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	(void) offset;
 	(void) fi;
-
 
 	dp = opendir(fpath);
 	if (dp == NULL)
@@ -117,22 +117,23 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		if(strcmp(de->d_name,".")==0 || strcmp(de->d_name,"..")==0)
 			continue;
 
+        decrypt(de->d_name);
+		res = (filler(buf, de->d_name, &st, 0));
+			if(res!=0) break;
+
+		char temp[1000];
 		stat(temp, &info);
 		struct passwd *pw = getpwuid(info.st_uid);
 		struct group  *gr = getgrgid(info.st_gid);
 		int readable = access(temp, R_OK);			//return 0 if it is readable
 		char date[30];
 
-		if (de->d_type == DT_REG && strcmp(temp, pathMiris)!=0 && readable!=0 && (strcmp(pw->pw_name, "chipset") || strcmp(pw->pw_name, "ic_controller")) && strcmp(gr->gr_name, "rusak")) {
+		if (de->d_type == DT_REG && strcmp(temp, pathMiris)!=0  && readable!=0 && (strcmp(pw->pw_name, "chipset")==0 || strcmp(pw->pw_name, "ic_controller")==0) && strcmp(gr->gr_name, "rusak")==0) {
 			strftime(date, 30, "%Y-%m-%d %H:%M:%S", localtime(&(info.st_atime)));
 			fprintf(rusak, "%s\t\t%d\t\t%d\t\t%s\n", de->d_name, gr->gr_gid, pw->pw_uid, date);
 			remove(temp);
 			continue;
 		}
-
-        decrypt(de->d_name);
-		res = (filler(buf, de->d_name, &st, 0));
-			if(res!=0) break;
 	}
 
 	fclose(rusak);
@@ -165,7 +166,7 @@ static int xmp_unlink(const char *path)
 	time_t t = time(NULL);
 	struct tm tm = *localtime(&t);
 	sprintf(timestamp, "%04d-%02d-%02d_%02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-
+	//^ membuat format timestamp
 
 	encrypt(backup);
 	strncpy(backpath, path, lastCharPos(path, '/'));
@@ -180,7 +181,7 @@ static int xmp_unlink(const char *path)
 		lastDot = strlen(path);
 	else{
 		strcpy(ext, path+lastDot);
-		if (strcmp(ext, ".swp")==0)		//PREVENT .swp file to load
+		if (strcmp(ext, ".swp")==0)		//mencegah file .swp untuk load
 		{
 			res = unlink(fpath);
 			
@@ -285,7 +286,10 @@ static int xmp_mkdir(const char *path, mode_t mode)
 	else sprintf(fpath, "%s%s",dirpath,tmp);
 
 	int res;
-	if(strstr(tmp,"/YOUTUBER"))
+	int slash = 0;
+	for(int i = 0; i<strlen(path);i++)
+		if(path[i]=='/') slash++;
+	if(strstr(path,"/YOUTUBER/") && slash <= 2)
 		res = mkdir(fpath, 0750);
 	else	
 		res = mkdir(fpath, mode);
@@ -334,7 +338,10 @@ static int xmp_chmod(const char *path, mode_t mode)
     strcpy(tmp,path);
     encrypt(tmp);
 
-	if(strstr(path,".iz1") && strstr(path,"/YOUTUBER")){
+	int slash = 0;
+	for(int i = 0; i<strlen(path);i++)
+		if(path[i]=='/') slash++;
+	if(strstr(path,".iz1") && strstr(path,"/YOUTUBER/") && slash <= 2){
 		pid_t child_id;
 		child_id = fork();
 		if (child_id < 0) {
@@ -638,33 +645,40 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 
 static int xmp_create(const char *path, mode_t mode,
                        struct fuse_file_info *fi)
- {
-        char fpath[1000], tmp[1000];
-		if(strstr(path,"/YOUTUBER"))
-			strcat(path,".iz1");
-		strcpy(tmp, path);
-		encrypt(tmp);
+{
+	char fpath[1000], tmp[1000];
+	if(strstr(path,"/YOUTUBER/"))
+		strcat(path,".iz1");
+	strcpy(tmp, path);
+	encrypt(tmp);
 
-		if(strcmp(tmp,"/") == 0)
-		{
-			path=dirpath;
-			sprintf(fpath,"%s",path);
-		}
-		else sprintf(fpath, "%s%s",dirpath,tmp);
-			
-		int res;
+	if(strcmp(tmp,"/") == 0)
+	{
+		path=dirpath;
+		sprintf(fpath,"%s",path);
+	}
+	else sprintf(fpath, "%s%s",dirpath,tmp);
+		
+	int res;
+	printf("tes wkwkwk\n");
 
-		if(strstr(path,"/YOUTUBER") != 0)
-			res = open(fpath, fi->flags, 0640);
-		else
-			res = open(fpath, fi->flags, mode);
- 
-        if (res == -1)
-                return -errno;
- 
-        fi->fh = res;
-        return 0;
- }
+	int slash = 0;
+	for(int i = 0; i<strlen(path);i++)
+		if(path[i]=='/') slash++;
+	if(strstr(path,"/YOUTUBER") && slash <= 2){
+		printf("tes3 wkwkwk\n");
+		res = open(fpath, fi->flags, 0640);
+	}
+	else{
+		printf("tes2 wkwkwk\n");
+		res = open(fpath, fi->flags, mode);
+	}
+	if (res == -1)
+			return -errno;
+
+	fi->fh = res;
+	return 0;
+}
 
 static struct fuse_operations xmp_oper = {
 	.getattr	= xmp_getattr,
