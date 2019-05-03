@@ -735,7 +735,7 @@ static int xmp_create(const char *path, mode_t mode,
 
 void* joinVideo(){
 	char video[] = "Video";
-	char videoPath[1000], filePath[1000], ch;
+	char videoPath[1000], filePath[1000];
 
 	encrypt(video);
 	sprintf(videoPath, "%s/%s",dirpath, video);
@@ -774,6 +774,7 @@ void* joinVideo(){
 		decrypt(de->d_name);
 		for(int i = 0; i <= 999; i++)
 		{
+			int dataCh;
 			char fileName[1000];
 			sprintf(fileName, "%s.%03d",de->d_name, i);
 			encrypt(fileName);
@@ -784,8 +785,8 @@ void* joinVideo(){
 
 			FILE* source = fopen(filePath, "r");
 
-			while ((ch = fgetc(source)) != EOF)
-				fprintf(target, "%c", ch);
+			while ((dataCh = fgetc(source)) != EOF)
+				fputc(dataCh, target);
 
 			fclose(source);
 		}
