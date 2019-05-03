@@ -12,12 +12,14 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
+#include <pthread.h>
 
 #define _XOPEN_SOURCE 700
 
 char cipher[] = "qE1~ YMUR2\"`hNIdPzi\%^t@(Ao:=CQ,nx4S[7mHFye#aT6+v)DfKL$r?bkOGB>}!9_wV\']jcp5JZ&Xl|\\8s;g<{3.u*W-0";
+static const char *dirpath = "/home/ivan/shift4";
 int key;
-static const char *dirpath = "/home/siung2/shift4";
+pthread_t tid;
 
 int lastCharPos(char *str, char chr){
 	char *posChar = strrchr(str, chr);
@@ -731,6 +733,102 @@ static int xmp_create(const char *path, mode_t mode,
 	return 0;
 }
 
+void* joinVideo(){
+	char video[] = "Video";
+	char videoPath[1000], filePath[1000], ch;
+
+	encrypt(video);
+	sprintf(videoPath, "%s/%s",dirpath, video);
+
+	mkdir(videoPath, 0777);
+
+ 	DIR *dirvideo;
+	struct dirent *de, **fileList;
+	dirvideo = opendir(videoPath);
+	if (dirvideo == NULL) {
+		return NULL;
+	}
+	int n = scandir(dirpath, &fileList, 0, alphasort);
+	int i = 0;
+	while(i < n){
+		de = fileList[i];
+		i++;
+		decrypt(de->d_name);
+		int lastDot = lastCharPos(de->d_name, '.');
+		if (de->d_type != DT_REG)
+			continue;
+
+ 		if (lastDot==0 || strlen(de->d_name)<4 || !((de->d_name[lastDot-3]=='m' && de->d_name[lastDot-2]=='k' && de->d_name[lastDot-1]=='v') || 
+			(de->d_name[lastDot-3]=='m' && de->d_name[lastDot-2]=='p' && de->d_name[lastDot-1]=='4')))
+			continue;
+		
+ 		de->d_name[lastDot] = '\0';
+		encrypt(de->d_name);
+		sprintf(filePath, "%s/%s", videoPath, de->d_name);
+
+		if (access(filePath, F_OK) != -1)
+			continue;
+		
+		FILE* target = fopen(filePath, "a");
+
+		decrypt(de->d_name);
+		for(int i = 0; i <= 999; i++)
+		{
+			char fileName[1000];
+			sprintf(fileName, "%s.%03d",de->d_name, i);
+			encrypt(fileName);
+
+ 			sprintf(filePath, "%s/%s", dirpath, fileName);
+			if (access(filePath, F_OK) < 0)
+				break;
+
+			FILE* source = fopen(filePath, "r");
+
+			while ((ch = fgetc(source)) != EOF)
+				fprintf(target, "%c", ch);
+
+			fclose(source);
+		}
+		fclose(target);
+	}
+
+ 	return NULL;
+}
+
+void deleteVideo(){
+	char video[] = "Video";
+	char videoPath[1000], filePath[1000];
+
+	encrypt(video);
+	sprintf(videoPath, "%s/%s",dirpath, video);
+
+ 	DIR *dirVideo;
+	struct dirent *de;
+	dirVideo = opendir(videoPath);
+	if (dirVideo == NULL) {
+		return;
+	}
+
+ 	while((de = readdir(dirVideo)) != NULL){
+		if (de->d_type == DT_REG) {
+			sprintf(filePath, "%s/%s", videoPath, de->d_name);
+			remove(filePath);
+		}
+	}
+	remove(videoPath);
+}
+static void* xmp_init(struct fuse_conn_info *conn)
+{
+	pthread_create(&tid,NULL,&joinVideo,NULL);
+	return NULL;
+}
+static void* xmp_destroy(struct fuse_conn_info *conn)
+{
+
+	deleteVideo();
+	return NULL;
+}
+
 static struct fuse_operations xmp_oper = {
 	.getattr	= xmp_getattr,
 	.readdir	= xmp_readdir,
@@ -751,6 +849,8 @@ static struct fuse_operations xmp_oper = {
 	.open		= xmp_open,
 	.utimens	= xmp_utimens,
 	.create		= xmp_create,
+	.init		= xmp_init,
+	.destroy	= xmp_destroy,
 };
 
 int main(int argc, char *argv[])
