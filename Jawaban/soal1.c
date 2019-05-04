@@ -126,14 +126,11 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		struct group  *gr = getgrgid(info.st_gid);
 		int readable = access(temp2, R_OK);			//return 0 if it is readable
 		char date[30];
-		printf("000 %s\n",gr->gr_name);
-		printf("111 %s\n",pw->pw_name);
-		printf("222 %s\n",de->d_name);
 
 		if (de->d_type == DT_REG && readable!=0 && strcmp(temp2,pathMiris) != 0 && (strcmp(pw->pw_name, "chipset")==0 || strcmp(pw->pw_name, "ic_controller")==0) && strcmp(gr->gr_name, "rusak")==0) {
 			strftime(date, 30, "%Y-%m-%d %H:%M:%S", localtime(&(info.st_atime)));
 			decrypt(de->d_name);
-			printf("123123123 %s\n",date);
+			// printf("123123123 %s\n",date);
 			fprintf(rusak, "%s\t\t%d\t\t%d\t\t%s\n", de->d_name, gr->gr_gid, pw->pw_uid, date);
 			remove(temp2);
 			continue;
@@ -207,7 +204,7 @@ static int xmp_unlink(const char *path)
 	sprintf(pathcur, "%s%s", dirpath, tmp);
 
 
-	sprintf(zipname, "%s_deleted_%s.zip\0", rawname, timestamp);
+	sprintf(zipname, "%s_deleted_%s\0", rawname, timestamp);
 	encrypt(zipname);
 	encrypt(trash);
 	encrypt(backupfile);
@@ -339,6 +336,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 	
 
 
+
 	encrypt(path);
 	sprintf(tmp, "%s/%s", dirpath,path);
 	if(access(tmp, R_OK)<0)				//jika tidak ada
@@ -368,6 +366,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 		if (strcmp(ext, ".swp")==0)	
 			return res;
 	}
+	// /satu/dua.txt
 	strncpy(filePathWithoutExt, path+posSlash+1, posDot-(posSlash+1)); // nama file tanpa ext
 	filePathWithoutExt[posDot-(posSlash+1)] = '\0'; //end of string
 	sprintf(fileNameBackup,"%s_%s%s", filePathWithoutExt, timestamp, ext);//nama akhir
@@ -818,6 +817,7 @@ void deleteVideo(){
 	}
 	remove(videoPath);
 }
+
 static void* xmp_init(struct fuse_conn_info *conn)
 {
 	pthread_create(&tid,NULL,&joinVideo,NULL);
@@ -825,7 +825,6 @@ static void* xmp_init(struct fuse_conn_info *conn)
 }
 static void* xmp_destroy(struct fuse_conn_info *conn)
 {
-
 	deleteVideo();
 	return NULL;
 }
